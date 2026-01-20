@@ -1,49 +1,57 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-// Create database file in the backend directory
-const dbPath = path.join(__dirname, '..', 'taskmanager.db');
+// Create PostgreSQL connection pool
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'taskmanager',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres123',
+});
 
-const db = new sqlite3.Database(dbPath, (err) => {
+// Test the connection
+pool.connect((err, client, release) => {
   if (err) {
-    console.error('Error opening database', err);
+    console.error('Error connecting to PostgreSQL database:', err.stack);
     process.exit(1);
   } else {
-    console.log('Connected to SQLite database');
-    
-    // Create tables if they don't exist
-    db.serialize(() => {
-      // Users table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          username TEXT UNIQUE NOT NULL,
-          email TEXT UNIQUE NOT NULL,
-          password TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      // Tasks table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS tasks (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER NOT NULL,
-          title TEXT NOT NULL,
-          description TEXT,
-          status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `);
-
-      // Create indexes
-      db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)`);
-      db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)`);
-    });
+    console.log('Connected to PostgreSQL database');
+    release();
   }
 });
 
+// Helper function to convert SQLite-style queries to PostgreSQL
+// For compatibility with existing route code
+const db = {
+  // Execute a query that returns multiple rows
+  all: (query, params, callback) => {
+    pool.query(query, params)
+      .then(result => callback(null, result.rows))
+      .catch(err => callback(err));
+  },
+
+  // Execute a query that returns a single row
+  get: (query, params, callback) => {
+    pool.query(query, params)
+      .then(result => callback(null, result.rows[0]))
+      .catch(err => callback(err));
+  },
+
+  // Execute a query that modifies data (INSERT, UPDATE, DELETE)
+  run: (query, params, callback) => {
+    pool.query(query, params)
+      .then(result => {
+        // Mimic SQLite's this.lastID and this.changes
+        const context = {
+          lastID: result.rows[0]?.id,
+          changes: result.rowCount
+        };
+        callback.call(context, null);
+      })
+      .catch(err => callback(err));
+  }
+};
+
 module.exports = db;
+
