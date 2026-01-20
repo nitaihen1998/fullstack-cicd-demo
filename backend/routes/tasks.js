@@ -11,11 +11,11 @@ router.use(authMiddleware);
 router.get('/', async (req, res) => {
   try {
     const { status } = req.query;
-    let query = 'SELECT * FROM tasks WHERE user_id = ?';
+    let query = 'SELECT * FROM tasks WHERE user_id = $1';
     const params = [req.user.id];
 
     if (status && (status === 'pending' || status === 'completed')) {
-      query += ' AND status = ?';
+      query += ' AND status = $2';
       params.push(status);
     }
 
@@ -39,7 +39,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     db.get(
-      'SELECT * FROM tasks WHERE id = ? AND user_id = ?',
+      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
       [id, req.user.id],
       (err, task) => {
         if (err) {
@@ -69,22 +69,16 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    db.run(
-      'INSERT INTO tasks (user_id, title, description, status) VALUES (?, ?, ?, ?)',
+    db.all(
+      'INSERT INTO tasks (user_id, title, description, status) VALUES ($1, $2, $3, $4) RETURNING *',
       [req.user.id, title, description || '', 'pending'],
-      function(err) {
+      (err, rows) => {
         if (err) {
           console.error('Create task error:', err);
           return res.status(500).json({ error: 'Server error' });
         }
 
-        const taskId = this.lastID;
-        db.get('SELECT * FROM tasks WHERE id = ?', [taskId], (err, task) => {
-          if (err) {
-            return res.status(500).json({ error: 'Server error' });
-          }
-          res.status(201).json(task);
-        });
+        res.status(201).json(rows[0]);
       }
     );
   } catch (error) {
@@ -101,7 +95,7 @@ router.put('/:id', async (req, res) => {
 
     // Check if task exists and belongs to user
     db.get(
-      'SELECT * FROM tasks WHERE id = ? AND user_id = ?',
+      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
       [id, req.user.id],
       (err, task) => {
         if (err) {
@@ -123,7 +117,7 @@ router.put('/:id', async (req, res) => {
         const updateStatus = status !== undefined ? status : task.status;
 
         db.run(
-          'UPDATE tasks SET title = ?, description = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+          'UPDATE tasks SET title = $1, description = $2, status = $3, updated_at = NOW() WHERE id = $4 AND user_id = $5',
           [updateTitle, updateDesc, updateStatus, id, req.user.id],
           function(err) {
             if (err) {
@@ -131,7 +125,7 @@ router.put('/:id', async (req, res) => {
               return res.status(500).json({ error: 'Server error' });
             }
 
-            db.get('SELECT * FROM tasks WHERE id = ?', [id], (err, updatedTask) => {
+            db.get('SELECT * FROM tasks WHERE id = $1', [id], (err, updatedTask) => {
               if (err) {
                 return res.status(500).json({ error: 'Server error' });
               }
@@ -153,7 +147,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     db.get(
-      'SELECT * FROM tasks WHERE id = ? AND user_id = ?',
+      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
       [id, req.user.id],
       (err, task) => {
         if (err) {
@@ -165,7 +159,7 @@ router.delete('/:id', async (req, res) => {
           return res.status(404).json({ error: 'Task not found' });
         }
 
-        db.run('DELETE FROM tasks WHERE id = ? AND user_id = ?', [id, req.user.id], (err) => {
+        db.run('DELETE FROM tasks WHERE id = $1 AND user_id = $2', [id, req.user.id], (err) => {
           if (err) {
             console.error('Delete error:', err);
             return res.status(500).json({ error: 'Server error' });
@@ -187,7 +181,7 @@ router.patch('/:id/toggle', async (req, res) => {
     const { id } = req.params;
 
     db.get(
-      'SELECT * FROM tasks WHERE id = ? AND user_id = ?',
+      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
       [id, req.user.id],
       (err, task) => {
         if (err) {
@@ -202,7 +196,7 @@ router.patch('/:id/toggle', async (req, res) => {
         const newStatus = task.status === 'pending' ? 'completed' : 'pending';
 
         db.run(
-          'UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+          'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3',
           [newStatus, id, req.user.id],
           function(err) {
             if (err) {
@@ -210,7 +204,7 @@ router.patch('/:id/toggle', async (req, res) => {
               return res.status(500).json({ error: 'Server error' });
             }
 
-            db.get('SELECT * FROM tasks WHERE id = ?', [id], (err, updatedTask) => {
+            db.get('SELECT * FROM tasks WHERE id = $1', [id], (err, updatedTask) => {
               if (err) {
                 return res.status(500).json({ error: 'Server error' });
               }

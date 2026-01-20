@@ -1,5 +1,5 @@
 #----- BUILD STAGE -----#
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
@@ -16,14 +16,20 @@ FROM nginx:1.29.4-alpine
 
 COPY --from=build /app/build /usr/share/nginx/html
 
-RUN adduser -r -U nginx-user && \
-    chown -R nginx-user:nginx-user /usr/share/nginx/*
+# Create custom nginx config for port 8080
+RUN printf 'server {\n\
+    listen 8080;\n\
+    server_name localhost;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    location / {\n\
+        try_files $uri /index.html;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
-USER nginx-user
+EXPOSE 8080
 
-EXPOSE 80
-
-ENTRYPOINT ["nginx", "-g", "daemon off;"]
+CMD ["nginx", "-g", "daemon off;"]
 
 
 

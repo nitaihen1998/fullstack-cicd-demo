@@ -17,7 +17,7 @@ router.post('/register', async (req, res) => {
 
     // Check if user already exists
     db.get(
-      'SELECT * FROM users WHERE email = ? OR username = ?',
+      'SELECT * FROM users WHERE email = $1 OR username = $2',
       [email, username],
       async (err, user) => {
         if (err) {
@@ -33,36 +33,29 @@ router.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create user
-        db.run(
-          'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+        // Create user with RETURNING clause
+        db.all(
+          'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
           [username, email, hashedPassword],
-          function(err) {
+          (err, rows) => {
             if (err) {
               console.error('Insert error:', err);
               return res.status(500).json({ error: 'Server error' });
             }
 
-            const userId = this.lastID;
+            const newUser = rows[0];
 
-            // Get the created user
-            db.get('SELECT id, username, email, created_at FROM users WHERE id = ?', [userId], (err, newUser) => {
-              if (err) {
-                return res.status(500).json({ error: 'Server error' });
-              }
+            // Create JWT token
+            const token = jwt.sign(
+              { id: newUser.id, username: newUser.username },
+              process.env.JWT_SECRET,
+              { expiresIn: process.env.JWT_EXPIRE }
+            );
 
-              // Create JWT token
-              const token = jwt.sign(
-                { id: newUser.id, username: newUser.username },
-                process.env.JWT_SECRET,
-                { expiresIn: process.env.JWT_EXPIRE }
-              );
-
-              res.status(201).json({
-                message: 'User registered successfully',
-                token,
-                user: newUser
-              });
+            res.status(201).json({
+              message: 'User registered successfully',
+              token,
+              user: newUser
             });
           }
         );
@@ -85,7 +78,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Check if user exists
-    db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
+    db.get('SELECT * FROM users WHERE email = $1', [email], async (err, user) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Server error' });
