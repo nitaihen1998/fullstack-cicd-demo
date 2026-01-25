@@ -11,10 +11,10 @@ const poolConfig = {
   // SSL configuration for AWS RDS (required for RDS)
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   // Connection pool settings
-  max: parseInt(process.env.DB_POOL_MAX) || 20,
-  min: parseInt(process.env.DB_POOL_MIN) || 2,
-  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
-  connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000,
+  max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+  min: parseInt(process.env.DB_POOL_MIN, 10) || 2,
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT, 10) || 30000,
+  connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT, 10) || 10000,
 };
 
 const pool = new Pool(poolConfig);

@@ -148,8 +148,8 @@ resource "aws_db_instance" "taskmanager" {
   backup_retention_period = local.backup_retention_period
   backup_window          = "03:00-04:00"  # UTC time
   maintenance_window     = "mon:04:00-mon:05:00"  # UTC time
-  skip_final_snapshot    = false
-  final_snapshot_identifier = "taskmanager-final-snapshot-${var.environment}-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
+  skip_final_snapshot    = var.environment == "production" ? false : true
+  final_snapshot_identifier = var.environment == "production" ? "taskmanager-final-snapshot-${var.environment}" : null
 
   # Enhanced Monitoring and Logging
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
@@ -172,13 +172,12 @@ resource "aws_db_instance" "taskmanager" {
 
   # Lifecycle
   lifecycle {
-    # Prevent accidental deletion
-    prevent_destroy = false  # Set to true for production after initial setup
+    # Prevent accidental deletion in production
+    prevent_destroy = false  # Set to true manually for production after initial setup
     
     # Ignore password changes after initial creation (manage externally)
     ignore_changes = [
-      password,
-      final_snapshot_identifier
+      password
     ]
   }
 }
