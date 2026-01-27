@@ -1,1 +1,7 @@
 .github
+./*/.env
+./*/node_modules
+./*/build
+./terraform/terraform.tfstate
+./terraform/terraform.tfstate.backup
+./terraform/terraform.tfvars

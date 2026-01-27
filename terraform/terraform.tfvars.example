@@ -1,6 +1,0 @@
-environment            = "dev"
-vpc_id                = "vpc-xxxxxxxxxxxxx"
-subnet_ids            = ["subnet-xxxxx", "subnet-yyyyy"]
-app_security_group_id = "sg-xxxxxxxxxxxxx"
-db_username           = "taskmanager_admin"
-# db_password - set via environment variable or AWS Secrets Manager
